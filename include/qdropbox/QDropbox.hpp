@@ -74,6 +74,7 @@ public:
     void listFolderContinue(const QString& cursor);
     void createFolder(const QString& path, const bool& autorename = false);
     void deleteFile(const QString& path);
+    void deleteBatch(const QStringList& paths);
     void move(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
     void rename(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
     void getThumbnail(const QString& path, const QString& size = "w128h128", const QString& format = "jpeg");
@@ -112,6 +113,7 @@ Q_SIGNALS:
     void listFolderContinueLoaded(QList<QDropboxFile*>& files, const QString& prevCursor, const QString& cursor, const bool& hasMore);
     void folderCreated(QDropboxFile* folder);
     void fileDeleted(QDropboxFile* folder);
+    void deletedBatch();
     void moved(QDropboxFile* file);
     void renamed(QDropboxFile* file);
     void thumbnailLoaded(const QString& path, const QString& size, QImage* thumbnail);
@@ -153,6 +155,7 @@ private slots:
     void onListFolderContinueLoaded();
     void onFolderCreated();
     void onFileDeleted();
+    void onDeletedBatch();
     void onMoved();
     void onRenamed();
     void onThumbnailLoaded();

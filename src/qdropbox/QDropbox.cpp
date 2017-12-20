@@ -256,6 +256,43 @@ void QDropbox::onFileDeleted() {
     reply->deleteLater();
 }
 
+void QDropbox::deleteBatch(const QStringList& paths) {
+    QNetworkRequest req = prepareRequest("/files/delete_batch");
+    QVariantMap map;
+    QVariantList entries;
+    foreach(QString path, paths) {
+        QVariantMap p;
+        p["path"] = path;
+        entries.append(p);
+    }
+    map["entries"] = entries;
+
+    QByteArray data = QJson::Serializer().serialize(map);
+    logger.debug(data);
+
+    QNetworkReply* reply = m_network.post(req, data);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onDeletedBatch()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onDeletedBatch() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        QJson::Parser parser;
+        bool res = false;
+        QVariant data = parser.parse(reply->readAll(), &res);
+        if (res) {
+            emit deletedBatch();
+        }
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::move(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder, const bool& autorename, const bool& allowOwnershipTransfer) {
     QNetworkReply* reply = moveFile(fromPath, toPath, allowSharedFolder, autorename, allowOwnershipTransfer);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onMoved()));
