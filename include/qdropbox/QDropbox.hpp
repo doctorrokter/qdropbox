@@ -34,6 +34,38 @@
 #include "QDropboxSpaceUsage.hpp"
 #include "Logger.hpp"
 
+struct MoveEntry : public QObject {
+    MoveEntry(const QString& fromPath, const QString& toPath, QObject* parent = 0) : QObject(parent) {
+        this->fromPath = fromPath;
+        this->toPath = toPath;
+    }
+
+    MoveEntry(const MoveEntry& e) : QObject(e.parent()) {
+        swap(e);
+    }
+
+    MoveEntry& operator=(const MoveEntry& e) {
+        swap(e);
+        return *this;
+    }
+
+    QString fromPath;
+    QString toPath;
+
+    QVariantMap toMap() {
+        QVariantMap map;
+        map["from_path"] = fromPath;
+        map["to_path"] = toPath;
+        return map;
+    }
+
+private:
+    void swap(const MoveEntry& e) {
+        this->fromPath = e.fromPath;
+        this->toPath = e.toPath;
+    };
+};
+
 class QDropbox : public QObject {
     Q_OBJECT
 public:
@@ -76,6 +108,7 @@ public:
     void deleteFile(const QString& path);
     void deleteBatch(const QStringList& paths);
     void move(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
+    void moveBatch(const QList<MoveEntry>& moveEntries, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
     void rename(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
     void getThumbnail(const QString& path, const QString& size = "w128h128", const QString& format = "jpeg");
     void download(const QString& path, const QString& rev = "");
@@ -115,6 +148,7 @@ Q_SIGNALS:
     void fileDeleted(QDropboxFile* folder);
     void deletedBatch();
     void moved(QDropboxFile* file);
+    void movedBatch();
     void renamed(QDropboxFile* file);
     void thumbnailLoaded(const QString& path, const QString& size, QImage* thumbnail);
     void downloadStarted(const QString& path);
@@ -157,6 +191,7 @@ private slots:
     void onFileDeleted();
     void onDeletedBatch();
     void onMoved();
+    void onMovedBatch();
     void onRenamed();
     void onThumbnailLoaded();
     void onDownloaded();

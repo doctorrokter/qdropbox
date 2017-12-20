@@ -320,6 +320,39 @@ void QDropbox::onMoved() {
     reply->deleteLater();
 }
 
+void QDropbox::moveBatch(const QList<MoveEntry>& moveEntries, const bool& allowSharedFolder, const bool& autorename, const bool& allowOwnershipTransfer) {
+    QNetworkRequest req = prepareRequest("/files/move_batch");
+    QVariantMap map;
+    QVariantList entries;
+    foreach(MoveEntry e, moveEntries) {
+        entries.append(e.toMap());
+    }
+    map["entries"] = entries;
+    map["allow_shared_folder"] = allowSharedFolder;
+    map["autorename"] = autorename;
+    map["allow_ownership_transfer"] = allowOwnershipTransfer;
+
+    QByteArray data = QJson::Serializer().serialize(map);
+    logger.debug(data);
+
+    QNetworkReply* reply = m_network.post(req, data);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onMovedBatch()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onMovedBatch() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        emit movedBatch();
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::rename(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder, const bool& autorename, const bool& allowOwnershipTransfer) {
     QNetworkReply* reply = moveFile(fromPath, toPath, allowSharedFolder, autorename, allowOwnershipTransfer);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onRenamed()));
@@ -977,6 +1010,7 @@ void QDropbox::onSharedLinksLoaded() {
         bool res = false;
         QVariant data = QJson::Parser().parse(reply->readAll(), &res);
         if (res) {
+            logger.debug(data);
             QVariantList list = data.toMap().value("links").toList();
             QList<SharedLink*> links;
             foreach(QVariant v, list) {
@@ -1075,15 +1109,14 @@ void QDropbox::onCurrentAccountLoaded() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
+            logger.debug(data);
             Account* account = new Account(this);
             account->fromMap(data.toMap());
             emit currentAccountLoaded(account);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -1103,15 +1136,13 @@ void QDropbox::onSpaceUsageLoaded() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QDropboxSpaceUsage* spaceUsage = new QDropboxSpaceUsage(this);
             spaceUsage->fromMap(data.toMap());
             emit spaceUsageLoaded(spaceUsage);
         }
-        delete res;
     }
 
     reply->deleteLater();
