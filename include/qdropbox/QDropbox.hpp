@@ -223,6 +223,7 @@ private slots:
 
 private:
     static Logger logger;
+    static qint64 uploadSize;
 
     QNetworkAccessManager m_network;
 

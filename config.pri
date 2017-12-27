@@ -47,6 +47,7 @@ config_pri_source_group1 {
         $$quote($$BASEDIR/src/qdropbox/QDropboxSpaceUsage.cpp) \
         $$quote($$BASEDIR/src/qdropbox/QDropboxTag.cpp) \
         $$quote($$BASEDIR/src/qdropbox/QDropboxTempLink.cpp) \
+        $$quote($$BASEDIR/src/qdropbox/QDropboxUpload.cpp) \
         $$quote($$BASEDIR/src/qdropbox/QDropboxViewerInfoPolicy.cpp) \
         $$quote($$BASEDIR/src/qdropbox/SharedLink.cpp) \
         $$quote($$BASEDIR/src/qjson/json_parser.cc) \
@@ -75,6 +76,7 @@ config_pri_source_group1 {
         $$quote($$BASEDIR/include/qdropbox/QDropboxSpaceUsage.hpp) \
         $$quote($$BASEDIR/include/qdropbox/QDropboxTag.hpp) \
         $$quote($$BASEDIR/include/qdropbox/QDropboxTempLink.hpp) \
+        $$quote($$BASEDIR/include/qdropbox/QDropboxUpload.hpp) \
         $$quote($$BASEDIR/include/qdropbox/QDropboxViewerInfoPolicy.hpp) \
         $$quote($$BASEDIR/include/qdropbox/SharedLink.hpp) \
         $$quote($$BASEDIR/include/qdropbox/qdropbox_global.hpp) \

@@ -17,6 +17,8 @@
 
 Logger QDropbox::logger = Logger::getLogger("QDropbox");
 
+qint64 QDropbox::uploadSize = 157286400; // 150MB
+
 QDropbox::QDropbox(QObject* parent) : QObject(parent) {
     init();
 }
@@ -110,9 +112,7 @@ void QDropbox::listFolder(const QString& path, const bool& includeMediaInfo, con
     map["include_has_explicit_shared_members"] = includeHasExplicitSharedMembers;
     map["include_mounted_folders"] = includeMountedFolders;
 
-    QJson::Serializer serializer;
-
-    QNetworkReply* reply = m_network.post(req, serializer.serialize(map));
+    QNetworkReply* reply = m_network.post(req, QJson::Serializer().serialize(map));
     reply->setProperty("path", path);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onListFolderLoaded()));
     Q_ASSERT(res);
@@ -125,14 +125,14 @@ void QDropbox::onListFolderLoaded() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QVariantMap dataMap = data.toMap();
             QString cursor = dataMap.value("cursor").toString();
             bool hasMore = dataMap.value("has_more").toBool();
             QVariantList entries = dataMap.value("entries").toList();
+            logger.debug("Entries: " + QString::number(entries.size()));
             QList<QDropboxFile*> files;
             foreach(QVariant v, entries) {
                 QDropboxFile* pFile = new QDropboxFile(this);
@@ -141,7 +141,6 @@ void QDropbox::onListFolderLoaded() {
             }
             emit listFolderLoaded(reply->property("path").toString(), files, cursor, hasMore);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -152,9 +151,7 @@ void QDropbox::listFolderContinue(const QString& cursor) {
     QVariantMap map;
     map["cursor"] = cursor;
 
-    QJson::Serializer serializer;
-
-    QNetworkReply* reply = m_network.post(req, serializer.serialize(map));
+    QNetworkReply* reply = m_network.post(req, QJson::Serializer().serialize(map));
     reply->setProperty("cursor", cursor);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onListFolderContinueLoaded()));
     Q_ASSERT(res);
@@ -168,14 +165,14 @@ void QDropbox::onListFolderContinueLoaded() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QVariantMap dataMap = data.toMap();
             QString cursor = dataMap.value("cursor").toString();
             bool hasMore = dataMap.value("has_more").toBool();
             QVariantList entries = dataMap.value("entries").toList();
+            logger.debug("Entries: " + QString::number(entries.size()));
             QList<QDropboxFile*> files;
             foreach(QVariant v, entries) {
                 QDropboxFile* pFile = new QDropboxFile(this);
@@ -184,7 +181,6 @@ void QDropbox::onListFolderContinueLoaded() {
             }
             emit listFolderContinueLoaded(files, reply->property("cursor").toString(), cursor, hasMore);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -196,8 +192,7 @@ void QDropbox::createFolder(const QString& path, const bool& autorename) {
     map["path"] = path;
     map["autorename"] = autorename;
 
-    QJson::Serializer serializer;
-    QNetworkReply* reply = m_network.post(req, serializer.serialize(map));
+    QNetworkReply* reply = m_network.post(req, QJson::Serializer().serialize(map));
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onFolderCreated()));
     Q_ASSERT(res);
     res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
@@ -209,16 +204,14 @@ void QDropbox::onFolderCreated() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QDropboxFile* pFolder = new QDropboxFile(this);
             pFolder->fromMap(data.toMap().value("metadata").toMap());
             pFolder->setTag("folder");
             emit folderCreated(pFolder);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -229,8 +222,7 @@ void QDropbox::deleteFile(const QString& path) {
     QVariantMap map;
     map["path"] = path;
 
-    QJson::Serializer serializer;
-    QNetworkReply* reply = m_network.post(req, serializer.serialize(map));
+    QNetworkReply* reply = m_network.post(req, QJson::Serializer().serialize(map));
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onFileDeleted()));
     Q_ASSERT(res);
     res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
@@ -242,15 +234,13 @@ void QDropbox::onFileDeleted() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QDropboxFile* pFile = new QDropboxFile(this);
             pFile->fromMap(data.toMap().value("metadata").toMap());
             emit fileDeleted(pFile);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -306,15 +296,13 @@ void QDropbox::onMoved() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QDropboxFile* pFile = new QDropboxFile(this);
             pFile->fromMap(data.toMap().value("metadata").toMap());
             emit moved(pFile);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -366,15 +354,13 @@ void QDropbox::onRenamed() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             QDropboxFile* pFile = new QDropboxFile(this);
             pFile->fromMap(data.toMap().value("metadata").toMap());
             emit renamed(pFile);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -1010,7 +996,6 @@ void QDropbox::onSharedLinksLoaded() {
         bool res = false;
         QVariant data = QJson::Parser().parse(reply->readAll(), &res);
         if (res) {
-            logger.debug(data);
             QVariantList list = data.toMap().value("links").toList();
             QList<SharedLink*> links;
             foreach(QVariant v, list) {
@@ -1044,15 +1029,13 @@ void QDropbox::onAccountLoaded() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        QJson::Parser parser;
-        bool* res = new bool(false);
-        QVariant data = parser.parse(reply->readAll(), res);
-        if (*res) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
             Account* account = new Account(this);
             account->fromMap(data.toMap());
             emit accountLoaded(account);
         }
-        delete res;
     }
 
     reply->deleteLater();
@@ -1112,7 +1095,6 @@ void QDropbox::onCurrentAccountLoaded() {
         bool res = false;
         QVariant data = QJson::Parser().parse(reply->readAll(), &res);
         if (res) {
-            logger.debug(data);
             Account* account = new Account(this);
             account->fromMap(data.toMap());
             emit currentAccountLoaded(account);
