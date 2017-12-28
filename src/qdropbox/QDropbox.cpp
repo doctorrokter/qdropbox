@@ -93,6 +93,27 @@ QString QDropbox::authUrl() const {
     return QString(m_authUrl).append("/authorize?response_type=token&client_id=").append(m_appKey).append("&redirect_uri=").append(m_redirectUri);
 }
 
+void QDropbox::authTokenRevoke() {
+    QNetworkRequest req = prepareRequest("/auth/token/revoke");
+
+    QNetworkReply* reply = m_network.post(req, "");
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onAuthTokenRevoked()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onAuthTokenRevoked() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        emit authTokenRevoked();
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::listFolder(const QString& path, const bool& includeMediaInfo, const bool& recursive,
                     const bool& includeDeleted, const bool& includeHasExplicitSharedMembers, const bool& includeMountedFolders,
                     const int& limit, SharedLink sharedLink) {

@@ -99,6 +99,9 @@ public:
 
     QString authUrl() const;
 
+    // auth
+    void authTokenRevoke();
+
     // files
     void listFolder(const QString& path = "", const bool& includeMediaInfo = false, const bool& recursive = false,
                     const bool& includeDeleted = false, const bool& includeHasExplicitSharedMembers = false, const bool& includeMountedFolders = true,
@@ -140,6 +143,9 @@ public:
 
 Q_SIGNALS:
     void accessTokenChanged(const QString& accessToken);
+
+    // auth
+    void authTokenRevoked();
 
     // files signals
     void listFolderLoaded(const QString& path, QList<QDropboxFile*>& files, const QString& cursor, const bool& hasMore);
@@ -183,6 +189,9 @@ Q_SIGNALS:
 
 private slots:
     void onError(QNetworkReply::NetworkError e);
+
+    // auth
+    void onAuthTokenRevoked();
 
     // files slots
     void onListFolderLoaded();
