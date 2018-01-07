@@ -457,6 +457,34 @@ void QDropbox::download(const QString& path, const QString& rev) {
     emit downloadStarted(path);
 }
 
+void QDropbox::downloadZip(const QString& path, const QString& rev) {
+    QNetworkRequest req = prepareContentRequest("/files/download_zip");
+
+    QVariantMap map;
+    map["path"] = path;
+    if (!rev.isEmpty()) {
+        map["rev"] = rev;
+    }
+
+    req.setRawHeader("Dropbox-API-Arg", QJson::Serializer().serialize(map));
+
+    QNetworkReply* reply = m_network.post(req, "");
+    reply->setReadBufferSize(m_readBufferSize);
+    reply->setProperty("path", path);
+    m_downloadsQueue.append(reply);
+
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onDownloadedZip()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(onDownloadProgress(qint64,qint64)));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(readyRead()), this, SLOT(readZip()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+    emit downloadStarted(path);
+}
+
 void QDropbox::read() {
     QNetworkReply* reply = getReply();
     QString path = reply->property("path").toString();
@@ -466,6 +494,21 @@ void QDropbox::read() {
     }
 
     QFile file(m_downloadsFolder + "/" + getFilename(path));
+    file.open(QIODevice::WriteOnly | QIODevice::Append);
+    file.write(reply->readAll());
+    file.flush();
+    file.close();
+}
+
+void QDropbox::readZip() {
+    QNetworkReply* reply = getReply();
+    QString path = reply->property("path").toString();
+    QDir dir(m_downloadsFolder);
+    if (!dir.exists()) {
+        dir.mkpath(m_downloadsFolder);
+    }
+
+    QFile file(m_downloadsFolder + "/" + getFilename(path) + ".zip");
     file.open(QIODevice::WriteOnly | QIODevice::Append);
     file.write(reply->readAll());
     file.flush();
@@ -484,6 +527,21 @@ void QDropbox::onDownloaded() {
         QString path = reply->property("path").toString();
         QString filename = getFilename(path);
         QString localPath = m_downloadsFolder + "/" + filename;
+        logger.debug("File downloaded: " + localPath);
+        emit downloaded(path, localPath);
+    }
+
+    m_downloadsQueue.removeAll(reply);
+    reply->deleteLater();
+}
+
+void QDropbox::onDownloadedZip() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        QString path = reply->property("path").toString();
+        QString filename = getFilename(path);
+        QString localPath = m_downloadsFolder + "/" + filename + ".zip";
         logger.debug("File downloaded: " + localPath);
         emit downloaded(path, localPath);
     }

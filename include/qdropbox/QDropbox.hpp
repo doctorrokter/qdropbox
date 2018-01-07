@@ -115,6 +115,7 @@ public:
     void rename(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
     void getThumbnail(const QString& path, const QString& size = "w128h128", const QString& format = "jpeg");
     void download(const QString& path, const QString& rev = "");
+    void downloadZip(const QString& path, const QString& rev = "");
     void upload(QFile* file, const QString& remotePath, const QString& mode = "add", const bool& autorename = true, const bool& mute = false);
     void uploadSessionStart(const QString& remotePath, const QByteArray& data, const bool& close = false);
     void uploadSessionAppend(const QString& sessionId, const QByteArray& data, const qint64& offset, const bool& close = false);
@@ -204,6 +205,7 @@ private slots:
     void onRenamed();
     void onThumbnailLoaded();
     void onDownloaded();
+    void onDownloadedZip();
     void onDownloadProgress(qint64 loaded, qint64 total);
     void onUploaded();
     void onUploadProgress(qint64 loaded, qint64 total);
@@ -211,6 +213,7 @@ private slots:
     void onUploadSessionAppended();
     void onUploadSessionFinished();
     void read();
+    void readZip();
     void onTemporaryLinkLoaded();
 
     // sharing slots
