@@ -121,6 +121,7 @@ public:
     void uploadSessionAppend(const QString& sessionId, const QByteArray& data, const qint64& offset, const bool& close = false);
     void uploadSessionFinish(const QString& sessionId, const QByteArray& data, const qint64& offset, const QString& path, const QString& mode = "add", const bool& autorename = false, const bool& mute = false);
     void getTemporaryLink(const QString& path);
+    void saveUrl(const QString& path, const QString& url);
 
     // sharing
     void addFolderMember(const QString& sharedFolderId, const QList<QDropboxMember>& members, const bool& quiet = false, const QString& customMessage = "");
@@ -168,6 +169,7 @@ Q_SIGNALS:
     void uploadSessionAppended(const QString& sessionId);
     void uploadSessionFinished(QDropboxFile* file);
     void temporaryLinkLoaded(QDropboxTempLink* link);
+    void urlSaved();
 
     // sharing signals
     void folderMemberAdded(const QString& sharedFolderId);
@@ -215,6 +217,7 @@ private slots:
     void read();
     void readZip();
     void onTemporaryLinkLoaded();
+    void onUrlSaved();
 
     // sharing slots
     void onFolderMemberAdded();

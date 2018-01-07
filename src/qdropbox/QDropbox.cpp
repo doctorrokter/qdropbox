@@ -760,6 +760,34 @@ void QDropbox::onTemporaryLinkLoaded() {
     reply->deleteLater();
 }
 
+void QDropbox::saveUrl(const QString& path, const QString& url) {
+    QNetworkRequest req = prepareRequest("/files/save_url");
+    QString filename = url.split("/").last();
+    QVariantMap map;
+    map["path"] = path + "/" + filename;
+    map["url"] = url;
+
+    QByteArray data = QJson::Serializer().serialize(map);
+    logger.debug(data);
+
+    QNetworkReply* reply = m_network.post(req, data);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onUrlSaved()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onUrlSaved() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        emit urlSaved();
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::addFolderMember(const QString& sharedFolderId, const QList<QDropboxMember>& members, const bool& quiet, const QString& customMessage) {
     QNetworkRequest req = prepareRequest("/sharing/add_folder_member");
     QVariantMap map;
