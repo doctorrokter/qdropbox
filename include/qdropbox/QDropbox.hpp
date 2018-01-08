@@ -170,6 +170,7 @@ Q_SIGNALS:
     void uploadSessionFinished(QDropboxFile* file);
     void temporaryLinkLoaded(QDropboxTempLink* link);
     void urlSaved();
+    void uploadFailed(const QString& reason);
 
     // sharing signals
     void folderMemberAdded(const QString& sharedFolderId);
@@ -218,6 +219,7 @@ private slots:
     void readZip();
     void onTemporaryLinkLoaded();
     void onUrlSaved();
+    void onUploadError(QNetworkReply::NetworkError e);
 
     // sharing slots
     void onFolderMemberAdded();

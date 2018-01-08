@@ -574,12 +574,15 @@ void QDropbox::upload(QFile* file, const QString& remotePath, const QString& mod
         Q_ASSERT(res);
         res = QObject::connect(reply, SIGNAL(uploadProgress(qint64,qint64)), this, SLOT(onUploadProgress(qint64,qint64)));
         Q_ASSERT(res);
-        res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+        res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onUploadError(QNetworkReply::NetworkError)));
         Q_ASSERT(res);
         Q_UNUSED(res);
         emit uploadStarted(remotePath);
     } else {
-        logger.error("File " + file->fileName() + " does not exists");
+        QString error = "Cannot open file: " + file->fileName() + "\n" + QString::number(file->error());
+        logger.error(error);
+        emit uploadFailed(error);
+        file->deleteLater();
     }
 }
 
@@ -603,6 +606,14 @@ void QDropbox::onUploaded() {
 
     m_uploadsQueue.removeAll(reply);
     reply->deleteLater();
+}
+
+void QDropbox::onUploadError(QNetworkReply::NetworkError e) {
+    QNetworkReply* reply = getReply();
+    if (reply->error() != QNetworkReply::NoError) {
+        emit uploadFailed(reply->errorString());
+    }
+    Q_UNUSED(e);
 }
 
 void QDropbox::uploadSessionStart(const QString& remotePath, const QByteArray& data , const bool& close) {
