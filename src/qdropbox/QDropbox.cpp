@@ -18,6 +18,9 @@
 Logger QDropbox::logger = Logger::getLogger("QDropbox");
 
 qint64 QDropbox::uploadSize = 157286400; // 150MB
+#define DROPBOX_UPLOAD_SIZE 157286400 // 150 MB
+#define UPLOAD_SIZE 1048576 // 1 MB
+#define CONCURRENT_UPLOADS 5
 
 QDropbox::QDropbox(QObject* parent) : QObject(parent) {
     init();
@@ -153,14 +156,14 @@ void QDropbox::onListFolderLoaded() {
             QString cursor = dataMap.value("cursor").toString();
             bool hasMore = dataMap.value("has_more").toBool();
             QVariantList entries = dataMap.value("entries").toList();
-            logger.debug("Entries: " + QString::number(entries.size()));
             QList<QDropboxFile*> files;
             foreach(QVariant v, entries) {
                 QDropboxFile* pFile = new QDropboxFile(this);
                 pFile->fromMap(v.toMap());
                 files.append(pFile);
             }
-            emit listFolderLoaded(reply->property("path").toString(), files, cursor, hasMore);
+            QString path = reply->property("path").toString();
+            emit listFolderLoaded(path, files, cursor, hasMore);
         }
     }
 
@@ -193,14 +196,14 @@ void QDropbox::onListFolderContinueLoaded() {
             QString cursor = dataMap.value("cursor").toString();
             bool hasMore = dataMap.value("has_more").toBool();
             QVariantList entries = dataMap.value("entries").toList();
-            logger.debug("Entries: " + QString::number(entries.size()));
             QList<QDropboxFile*> files;
             foreach(QVariant v, entries) {
                 QDropboxFile* pFile = new QDropboxFile(this);
                 pFile->fromMap(v.toMap());
                 files.append(pFile);
             }
-            emit listFolderContinueLoaded(files, reply->property("cursor").toString(), cursor, hasMore);
+            QString prevCursor = reply->property("cursor").toString();
+            emit listFolderContinueLoaded(files, prevCursor, cursor, hasMore);
         }
     }
 
@@ -282,6 +285,7 @@ void QDropbox::deleteBatch(const QStringList& paths) {
     logger.debug(data);
 
     QNetworkReply* reply = m_network.post(req, data);
+    reply->setProperty("paths", paths);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onDeletedBatch()));
     Q_ASSERT(res);
     res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
@@ -297,7 +301,7 @@ void QDropbox::onDeletedBatch() {
         bool res = false;
         QVariant data = parser.parse(reply->readAll(), &res);
         if (res) {
-            emit deletedBatch();
+            emit deletedBatch(reply->property("paths").toStringList());
         }
     }
 
@@ -306,6 +310,8 @@ void QDropbox::onDeletedBatch() {
 
 void QDropbox::move(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder, const bool& autorename, const bool& allowOwnershipTransfer) {
     QNetworkReply* reply = moveFile(fromPath, toPath, allowSharedFolder, autorename, allowOwnershipTransfer);
+    reply->setProperty("from_path", fromPath);
+    reply->setProperty("to_path", toPath);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onMoved()));
     Q_ASSERT(res);
     res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
@@ -322,7 +328,7 @@ void QDropbox::onMoved() {
         if (res) {
             QDropboxFile* pFile = new QDropboxFile(this);
             pFile->fromMap(data.toMap().value("metadata").toMap());
-            emit moved(pFile);
+            emit moved(pFile, reply->property("from_path").toString(), reply->property("to_path").toString());
         }
     }
 
@@ -345,6 +351,7 @@ void QDropbox::moveBatch(const QList<MoveEntry>& moveEntries, const bool& allowS
     logger.debug(data);
 
     QNetworkReply* reply = m_network.post(req, data);
+    reply->setProperty("entries", entries);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onMovedBatch()));
     Q_ASSERT(res);
     res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
@@ -356,7 +363,14 @@ void QDropbox::onMovedBatch() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        emit movedBatch();
+        QList<MoveEntry> moveEntries;
+        QVariantList entries = reply->property("entries").toList();
+        foreach(QVariant v, entries) {
+            MoveEntry e;
+            e.fromMap(v.toMap());
+            moveEntries.append(e);
+        }
+        emit movedBatch(moveEntries);
     }
 
     reply->deleteLater();
@@ -389,7 +403,7 @@ void QDropbox::onRenamed() {
 
 void QDropbox::getThumbnail(const QString& path, const QString& size, const QString& format) {
     if (!path.trimmed().isEmpty()) {
-        QNetworkRequest req = prepareContentRequest("/files/get_thumbnail");
+        QNetworkRequest req = prepareContentRequest("/files/get_thumbnail", false);
 
         QVariantMap map;
 
@@ -403,7 +417,7 @@ void QDropbox::getThumbnail(const QString& path, const QString& size, const QStr
         QByteArray data = serializer.serialize(map);
         req.setRawHeader("Dropbox-API-Arg", data);
 
-        logger.debug("Dropbox-API-Arg: " + data);
+//        logger.debug("Dropbox-API-Arg: " + data);
 
         QNetworkReply* reply = m_network.post(req, "");
         reply->setProperty("path", path);
@@ -1299,7 +1313,7 @@ QNetworkRequest QDropbox::prepareRequest(const QString& apiMethod) {
     return req;
 }
 
-QNetworkRequest QDropbox::prepareContentRequest(const QString& apiMethod) {
+QNetworkRequest QDropbox::prepareContentRequest(const QString& apiMethod, const bool& log) {
     QUrl url(m_fullContentUrl + apiMethod);
 
     QNetworkRequest req;
@@ -1307,7 +1321,9 @@ QNetworkRequest QDropbox::prepareContentRequest(const QString& apiMethod) {
     req.setRawHeader("Authorization", QString("Bearer ").append(m_accessToken).toUtf8());
     req.setRawHeader("Content-Type", "application/octet-stream");
 
-    logger.debug(url);
+    if (log) {
+        logger.debug(url);
+    }
 
     return req;
 }
@@ -1327,4 +1343,44 @@ QNetworkReply* QDropbox::moveFile(const QString& fromPath, const QString& toPath
 
     QJson::Serializer serializer;
     return m_network.post(req, serializer.serialize(map));
+}
+
+void QDropbox::processUploadsQueue() {
+    QDropboxUpload& uploadObj = m_uploads.head();
+    if (uploadObj.getSize() == 0) {
+        uploadObj.resize();
+    }
+    if (uploadObj.getSize() <= DROPBOX_UPLOAD_SIZE) {
+        QFile* file = new QFile(uploadObj.getPath());
+        upload(file, uploadObj.getRemotePath());
+    } else {
+        if (uploadObj.isNew()) {
+            uploadObj.setUploadSize(UPLOAD_SIZE);
+            uploadSessionStart(uploadObj.getRemotePath(), uploadObj.next());
+        } else {
+            qint64 offset = uploadObj.getOffset();
+            if (uploadObj.lastPortion()) {
+                uploadSessionFinish(uploadObj.getSessionId(), uploadObj.next(), offset, uploadObj.getRemotePath());
+            } else {
+                uploadSessionAppend(uploadObj.getSessionId(), uploadObj.next(), offset);
+            }
+        }
+    }
+}
+
+void QDropbox::dequeue(QDropboxFile* file) {
+    if (file != 0) {
+        logger.info("File uploaded: " + file->getPathDisplay());
+        logger.info("File size: " + QString::number(file->getSize()));
+        file->deleteLater();
+    }
+
+    if (m_uploads.size()) {
+        m_uploads.dequeue();
+        logger.debug("upload dequeued");
+    }
+
+    if (m_uploads.size()) {
+        processUploadsQueue();
+    }
 }

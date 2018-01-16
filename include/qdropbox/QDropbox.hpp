@@ -18,6 +18,7 @@
 #include <QtGui/QImage>
 #include <QFile>
 #include <QStringList>
+#include <QQueue>
 
 #include "QDropboxMember.hpp"
 #include "QDropboxFolderAction.hpp"
@@ -33,12 +34,15 @@
 #include "Account.hpp"
 #include "QDropboxSpaceUsage.hpp"
 #include "Logger.hpp"
+#include "QDropboxUpload.hpp"
 
 struct MoveEntry : public QObject {
     MoveEntry(const QString& fromPath, const QString& toPath, QObject* parent = 0) : QObject(parent) {
         this->fromPath = fromPath;
         this->toPath = toPath;
     }
+
+    MoveEntry(QObject* parent = 0) : QObject(parent) {}
 
     MoveEntry(const MoveEntry& e) : QObject(e.parent()) {
         swap(e);
@@ -51,6 +55,12 @@ struct MoveEntry : public QObject {
 
     QString fromPath;
     QString toPath;
+    QString name;
+
+    void fromMap(const QVariantMap& map) {
+        fromPath = map.value("from_path").toString();
+        toPath = map.value("to_path").toString();
+    }
 
     QVariantMap toMap() {
         QVariantMap map;
@@ -154,9 +164,9 @@ Q_SIGNALS:
     void listFolderContinueLoaded(QList<QDropboxFile*>& files, const QString& prevCursor, const QString& cursor, const bool& hasMore);
     void folderCreated(QDropboxFile* folder);
     void fileDeleted(QDropboxFile* folder);
-    void deletedBatch();
-    void moved(QDropboxFile* file);
-    void movedBatch();
+    void deletedBatch(const QStringList& paths);
+    void moved(QDropboxFile* file, const QString& fromPath, const QString& toPath);
+    void movedBatch(const QList<MoveEntry>& moveEntries);
     void renamed(QDropboxFile* file);
     void thumbnailLoaded(const QString& path, const QString& size, QImage* thumbnail);
     void downloadStarted(const QString& path);
@@ -238,6 +248,8 @@ private slots:
     void onCurrentAccountLoaded();
     void onSpaceUsageLoaded();
 
+    void processUploadsQueue();
+
 private:
     static Logger logger;
     static qint64 uploadSize;
@@ -262,14 +274,15 @@ private:
     QString m_fullUrl;
     QString m_fullContentUrl;
 
+    QQueue<QDropboxUpload> m_uploads;
+
     void init();
     void generateFullUrl();
     void generateFullContentUrl();
-
     QString getFilename(const QString& path);
-
+    void dequeue(QDropboxFile* file = 0);
     QNetworkRequest prepareRequest(const QString& apiMethod);
-    QNetworkRequest prepareContentRequest(const QString& apiMethod);
+    QNetworkRequest prepareContentRequest(const QString& apiMethod, const bool& log = true);
     QNetworkReply* getReply();
 
     QNetworkReply* moveFile(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
