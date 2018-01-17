@@ -1070,7 +1070,22 @@ void QDropbox::onFolderUnshared() {
     QNetworkReply* reply = getReply();
 
     if (reply->error() == QNetworkReply::NoError) {
-        emit folderUnshared(reply->property("shared_folder_id").toString());
+        UnshareJobStatus status;
+        status.asyncJobId = "";
+        status.status = UnshareJobStatus::InProgress;
+        status.sharedFolderId = reply->property("shared_folder_id").toString();
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
+            QVariantMap map = data.toMap();
+            if (map.value(".tag").toString().compare("complete") == 0) {
+                status.status = UnshareJobStatus::Complete;
+            } else {
+                status.asyncJobId = map.value("async_job_id").toString();
+            }
+        }
+
+        emit folderUnshared(status);
     }
 
     reply->deleteLater();
@@ -1170,6 +1185,43 @@ void QDropbox::onSharedLinksLoaded() {
                 links.append(link);
             }
             emit sharedLinksLoaded(links);
+        }
+    }
+
+    reply->deleteLater();
+}
+
+void QDropbox::checkJobStatus(const QString& asyncJobId) {
+    QNetworkRequest req = prepareRequest("/sharing/check_job_status");
+    QVariantMap map;
+    map["async_job_id"] = asyncJobId;
+
+    QByteArray data = QJson::Serializer().serialize(map);
+    logger.debug(data);
+
+    QNetworkReply* reply = m_network.post(req, data);
+    reply->setProperty("async_job_id", asyncJobId);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onJobStatusChecked()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onJobStatusChecked() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
+            QVariantMap map = data.toMap();
+            if (map.contains(".tag")) {
+                UnshareJobStatus status;
+                status.asyncJobId = reply->property("async_job_id").toString();
+                status.status = map.value(".tag").toString().compare("complete") == 0 ? UnshareJobStatus::Complete : UnshareJobStatus::InProgress;
+                emit jobStatusChecked(status);
+            }
         }
     }
 

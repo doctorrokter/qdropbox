@@ -76,6 +76,17 @@ private:
     };
 };
 
+struct UnshareJobStatus {
+    enum Status {
+        InProgress,
+        Complete
+    };
+
+    Status status;
+    QString asyncJobId;
+    QString sharedFolderId;
+};
+
 class QDropbox : public QObject {
     Q_OBJECT
 public:
@@ -147,6 +158,7 @@ public:
     void createSharedLink(const QString& path, const bool& shortUrl = false, const QDropboxPendingUpload& pendingUpload = QDropboxPendingUpload());
     void revokeSharedLink(const QString& sharedLinkUrl);
     void getSharedLinks(const QString& path = "");
+    void checkJobStatus(const QString& asyncJobId);
 
     // users
     void getAccount(const QString& accountId);
@@ -190,10 +202,11 @@ Q_SIGNALS:
     void folderMemberUpdated(const QString& sharedFolderId, QDropboxMember* member);
     void listFolderMembersLoaded(const QString& sharedFolderId, const QList<QDropboxFolderMember*>& members, const QString& cursor = "");
     void folderShared(const QString& path, const QString& sharedFolderId);
-    void folderUnshared(const QString& sharedFolderId);
+    void folderUnshared(const UnshareJobStatus& jobStatus);
     void sharedLinkCreated(SharedLink* link);
     void sharedLinkRevoked(const QString& sharedLinkUrl);
     void sharedLinksLoaded(const QList<SharedLink*>& links);
+    void jobStatusChecked(const UnshareJobStatus& status);
 
     // users signals
     void accountLoaded(Account* account);
@@ -244,6 +257,7 @@ private slots:
     void onSharedLinkCreated();\
     void onSharedLinkRevoked();
     void onSharedLinksLoaded();
+    void onJobStatusChecked();
 
     // users slots
     void onAccountLoaded();
