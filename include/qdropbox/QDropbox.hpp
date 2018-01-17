@@ -132,6 +132,7 @@ public:
     void uploadSessionFinish(const QString& sessionId, const QByteArray& data, const qint64& offset, const QString& path, const QString& mode = "add", const bool& autorename = false, const bool& mute = false);
     void getTemporaryLink(const QString& path);
     void saveUrl(const QString& path, const QString& url);
+    void getMetadata(const QString& path, const bool& includeMediaInfo = false, const bool& includeDeleted = false, const bool& includeHasExplicitSharedMembers = false);
 
     // sharing
     void addFolderMember(const QString& sharedFolderId, const QList<QDropboxMember>& members, const bool& quiet = false, const QString& customMessage = "");
@@ -181,6 +182,7 @@ Q_SIGNALS:
     void temporaryLinkLoaded(QDropboxTempLink* link);
     void urlSaved();
     void uploadFailed(const QString& reason);
+    void metadataReceived(QDropboxFile* file);
 
     // sharing signals
     void folderMemberAdded(const QString& sharedFolderId);
@@ -230,6 +232,7 @@ private slots:
     void onTemporaryLinkLoaded();
     void onUrlSaved();
     void onUploadError(QNetworkReply::NetworkError e);
+    void onMetadataReceived();
 
     // sharing slots
     void onFolderMemberAdded();

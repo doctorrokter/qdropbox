@@ -813,6 +813,40 @@ void QDropbox::onUrlSaved() {
     reply->deleteLater();
 }
 
+void QDropbox::getMetadata(const QString& path, const bool& includeMediaInfo, const bool& includeDeleted, const bool& includeHasExplicitSharedMembers) {
+    QNetworkRequest req = prepareRequest("/files/get_metadata");
+    QVariantMap map;
+    map["path"] = path;
+    map["include_media_info"] = includeMediaInfo;
+    map["include_deleted"] = includeDeleted;
+    map["include_has_explicit_shared_members"] = includeHasExplicitSharedMembers;
+
+    QByteArray data = QJson::Serializer().serialize(map);
+    logger.debug(data);
+    QNetworkReply* reply = m_network.post(req, data);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onMetadataReceived()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onMetadataReceived() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
+            QDropboxFile* file = new QDropboxFile(this);
+            file->fromMap(data.toMap());
+            emit metadataReceived(file);
+        }
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::addFolderMember(const QString& sharedFolderId, const QList<QDropboxMember>& members, const bool& quiet, const QString& customMessage) {
     QNetworkRequest req = prepareRequest("/sharing/add_folder_member");
     QVariantMap map;
