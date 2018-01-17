@@ -1203,8 +1203,6 @@ void QDropbox::checkJobStatus(const QString& asyncJobId) {
     reply->setProperty("async_job_id", asyncJobId);
     bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onJobStatusChecked()));
     Q_ASSERT(res);
-    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
-    Q_ASSERT(res);
     Q_UNUSED(res);
 }
 
@@ -1222,6 +1220,13 @@ void QDropbox::onJobStatusChecked() {
                 status.status = map.value(".tag").toString().compare("complete") == 0 ? UnshareJobStatus::Complete : UnshareJobStatus::InProgress;
                 emit jobStatusChecked(status);
             }
+        }
+    } else {
+        QString errorString = reply->errorString();
+        logger.error(errorString);
+        logger.error(reply->error());
+        if (reply->bytesAvailable()) {
+            logger.error(reply->readAll());
         }
     }
 
