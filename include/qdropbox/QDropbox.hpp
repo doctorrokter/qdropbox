@@ -85,6 +85,20 @@ struct UnshareJobStatus {
     Status status;
     QString asyncJobId;
     QString sharedFolderId;
+
+    QVariantMap toMap() const {
+        QVariantMap map;
+        map["status"] = status == InProgress ? 0 : 1;
+        map["async_job_id"] = asyncJobId;
+        map["shared_folder_id"] = sharedFolderId;
+        return map;
+    }
+
+    void fromMap(const QVariantMap& map) {
+        status = map.value("status").toInt() == 0 ? InProgress : Complete;
+        asyncJobId = map.value("async_job_id").toString();
+        sharedFolderId = map.value("shared_folder_id").toString();
+    }
 };
 
 class QDropbox : public QObject {
