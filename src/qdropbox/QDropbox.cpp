@@ -210,6 +210,39 @@ void QDropbox::onListFolderContinueLoaded() {
     reply->deleteLater();
 }
 
+void QDropbox::listFolderLongPoll(const QString& cursor, const int& timeout) {
+    QNetworkRequest req = prepareNotifyRequest("/files/list_folder/longpoll");
+
+    QVariantMap map;
+    map["cursor"] = cursor;
+    map["timeout"] = timeout;
+
+    logger.debug(map);
+
+    QNetworkReply* reply = m_network.post(req, QJson::Serializer().serialize(map));
+    reply->setProperty("cursor", cursor);
+    bool res = QObject::connect(reply, SIGNAL(finished()), this, SLOT(onListFolderLongPoll()));
+    Q_ASSERT(res);
+    res = QObject::connect(reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SLOT(onError(QNetworkReply::NetworkError)));
+    Q_ASSERT(res);
+    Q_UNUSED(res);
+}
+
+void QDropbox::onListFolderLongPoll() {
+    QNetworkReply* reply = getReply();
+
+    if (reply->error() == QNetworkReply::NoError) {
+        bool res = false;
+        QVariant data = QJson::Parser().parse(reply->readAll(), &res);
+        if (res) {
+            QVariantMap dataMap = data.toMap();
+            emit listFolderLongPollFinished(reply->property("cursor").toString(), dataMap.value("changes").toBool());
+        }
+    }
+
+    reply->deleteLater();
+}
+
 void QDropbox::createFolder(const QString& path, const bool& autorename) {
     QNetworkRequest req = prepareRequest("/files/create_folder_v2");
     QVariantMap map;
@@ -1368,6 +1401,7 @@ void QDropbox::init() {
     m_authUrl = "https://dropbox.com/oauth2";
     m_url = "https://api.dropboxapi.com";
     m_contentUrl = "https://content.dropboxapi.com";
+    m_notifyUrl = "https://notify.dropboxapi.com";
     m_version = 2;
     m_redirectUri = "";
     m_appKey = "";
@@ -1377,6 +1411,7 @@ void QDropbox::init() {
     m_readBufferSize = 5242880; // 5MB
     generateFullUrl();
     generateFullContentUrl();
+    generateFullNotifyUrl();
 }
 
 void QDropbox::generateFullUrl() {
@@ -1385,6 +1420,10 @@ void QDropbox::generateFullUrl() {
 
 void QDropbox::generateFullContentUrl() {
     m_fullContentUrl = QString(m_contentUrl).append("/").append(QString::number(m_version));
+}
+
+void QDropbox::generateFullNotifyUrl() {
+    m_fullNotifyUrl = QString(m_notifyUrl).append("/").append(QString::number(m_version));
 }
 
 QString QDropbox::getFilename(const QString& path) {
@@ -1411,6 +1450,20 @@ QNetworkRequest QDropbox::prepareContentRequest(const QString& apiMethod, const 
     req.setUrl(url);
     req.setRawHeader("Authorization", QString("Bearer ").append(m_accessToken).toUtf8());
     req.setRawHeader("Content-Type", "application/octet-stream");
+
+    if (log) {
+        logger.debug(url);
+    }
+
+    return req;
+}
+
+QNetworkRequest QDropbox::prepareNotifyRequest(const QString& apiMethod, const bool& log) {
+    QUrl url(m_fullNotifyUrl + apiMethod);
+
+    QNetworkRequest req;
+    req.setUrl(url);
+    req.setRawHeader("Content-Type", "application/json");
 
     if (log) {
         logger.debug(url);

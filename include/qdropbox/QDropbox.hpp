@@ -142,6 +142,7 @@ public:
                     const bool& includeDeleted = false, const bool& includeHasExplicitSharedMembers = false, const bool& includeMountedFolders = true,
                     const int& limit = 0, SharedLink sharedLink = SharedLink());
     void listFolderContinue(const QString& cursor);
+    void listFolderLongPoll(const QString& cursor, const int& timeout = 30);
     void createFolder(const QString& path, const bool& autorename = false);
     void deleteFile(const QString& path);
     void deleteBatch(const QStringList& paths);
@@ -189,6 +190,7 @@ Q_SIGNALS:
     // files signals
     void listFolderLoaded(const QString& path, QList<QDropboxFile*>& files, const QString& cursor, const bool& hasMore);
     void listFolderContinueLoaded(QList<QDropboxFile*>& files, const QString& prevCursor, const QString& cursor, const bool& hasMore);
+    void listFolderLongPollFinished(const QString& cursor, const bool& changes);
     void folderCreated(QDropboxFile* folder);
     void fileDeleted(QDropboxFile* folder);
     void deletedBatch(const QStringList& paths);
@@ -239,6 +241,7 @@ private slots:
     // files slots
     void onListFolderLoaded();
     void onListFolderContinueLoaded();
+    void onListFolderLongPoll();
     void onFolderCreated();
     void onFileDeleted();
     void onDeletedBatch();
@@ -290,6 +293,7 @@ private:
     QString m_authUrl;
     QString m_url;
     QString m_contentUrl;
+    QString m_notifyUrl;
     int m_version;
 
     QString m_accessToken;
@@ -304,16 +308,19 @@ private:
 
     QString m_fullUrl;
     QString m_fullContentUrl;
+    QString m_fullNotifyUrl;
 
     QQueue<QDropboxUpload> m_uploads;
 
     void init();
     void generateFullUrl();
     void generateFullContentUrl();
+    void generateFullNotifyUrl();
     QString getFilename(const QString& path);
     void dequeue(QDropboxFile* file = 0);
     QNetworkRequest prepareRequest(const QString& apiMethod);
     QNetworkRequest prepareContentRequest(const QString& apiMethod, const bool& log = true);
+    QNetworkRequest prepareNotifyRequest(const QString& apiMethod, const bool& log = true);
     QNetworkReply* getReply();
 
     QNetworkReply* moveFile(const QString& fromPath, const QString& toPath, const bool& allowSharedFolder = false, const bool& autorename = false, const bool& allowOwnershipTransfer = false);
